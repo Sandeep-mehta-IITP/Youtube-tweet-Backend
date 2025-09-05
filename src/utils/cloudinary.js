@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
-import  fs  from "fs";
+import fs from "fs";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,6 +11,8 @@ const uploadOnCloudinary = async (localFilePath) => {
   try {
     if (!localFilePath) return null;
 
+    console.log("local file path", localFilePath);
+
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
       folder: "youtube-tweet",
@@ -19,14 +21,29 @@ const uploadOnCloudinary = async (localFilePath) => {
       unique_filename: true,
     });
 
-    fs.unlinkSync(localFilePath);
+    if (fs.existsSync(localFilePath)) {
+      fs.unlinkSync(localFilePath);
+    }
 
-    //console.log("File upload on Cloudinary", response);
+    console.log("File upload on Cloudinary", response);
     return response;
   } catch (error) {
+    console.error("Cloudinary Upload Error:", error);
     fs.unlinkSync(localFilePath); // remove the locally temporaly saved file as upload operation got failed
     return null;
   }
 };
 
-export { uploadOnCloudinary };
+const deleteFromCloudinary = async (publicId) => {
+  try {
+    const response = await cloudinary.uploader.destroy(publicId, {
+      resource_type: "auto",
+    });
+    return response;
+  } catch (error) {
+    console.error("Cloudinary Delete Error:", error.message);
+    return null;
+  }
+};
+
+export { uploadOnCloudinary, deleteFromCloudinary };
