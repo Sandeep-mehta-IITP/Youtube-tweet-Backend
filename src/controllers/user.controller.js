@@ -1,4 +1,4 @@
-import { log } from "console";
+
 import { User } from "../models/user.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
@@ -497,7 +497,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         isSubscribed: {
           $cond: {
-            $in: [req.user?._id, "$subscribers.subscriber"],
+            if: { $in: [new mongoose.Types.ObjectId(req.user?._id), "$subscribers.subscriber"] },
             then: true,
             else: false,
           },
@@ -520,13 +520,13 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   ]);
 
   if (!channel?.length) {
-    throw new apiError(400, "Channel does not exist.");
+    throw new apiError(404, "Channel does not exist.");
   }
 
   return res
     .status(200)
     .json(
-      new apiResponse(200, channel[0], "Channel details fetched successfully")
+      new apiResponse(200, channel[0], "Channel details fetched successfully")  // hume array me se first element chahiye kyunki user ki ek hi profile hogi 
     );
 });
 
