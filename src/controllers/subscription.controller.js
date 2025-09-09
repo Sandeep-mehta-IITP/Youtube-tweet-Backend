@@ -174,8 +174,27 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
   //   channel: channelId,
   // });
 
-  const subscribers = result[0]?.data;
+  const subscribers = result[0]?.data || [];
   const totalSubscribers = result[0]?.totalCount[0]?.count || 0;
+
+  if (skip >= totalSubscribers) {
+    return res.status(200).json(
+      new apiResponse(
+        200,
+        {
+          subscribers: [],
+          pagination: {
+            total: totalSubscribers,
+            page: pageNum,
+            limit: limitNum,
+            pages: Math.ceil(totalSubscribers / limitNum),
+            hasNextPage: false,
+          },
+        },
+        "No subsribers found for this page."
+      )
+    );
+  }
 
   const response = {
     subscribers,
@@ -196,6 +215,143 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
   const { subscriberId } = req.params;
+  const { page, limit } = req.query;
+
+  if (!isValidObjectId(subscriberId)) {
+    throw new apiError(400, "Invalid subscriber ID.");
+  }
+
+  // check if subscriber exists
+  const subscriberExists =
+    await User.findById(subscriberId).select("_id fullName");
+  if (!subscriberExists) {
+    throw new apiError(404, "Subscriber does not exist.");
+  }
+
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = parseInt(limit, 10) || 10;
+  const skip = (pageNum - 1) * limitNum;
+
+  const subscriptions = await Subscription.aggregate([
+    // Fetch only subscriptions for this subscriber
+    {
+      $match: {
+        subscriber: new mongoose.Types.ObjectId(subscriberId),
+      },
+    },
+    {
+      $facet: {
+        data: [
+          // Join with users collection to fetch channel details
+          {
+            $lookup: {
+              from: "users",
+              localField: "channel",
+              foreignField: "_id",
+              as: "channel",
+              pipeline: [
+                // Count total subscribers of each channel
+                {
+                  $lookup: {
+                    from: "subscriptions",
+                    localField: "_id",
+                    foreignField: "channel",
+                    as: "subscribersList",
+                  },
+                },
+                {
+                  $addFields: {
+                    totalSubscribers: {
+                      $size: "$subscribersList",
+                    },
+                  },
+                },
+                // Return only required channel fields
+                {
+                  $project: {
+                    _id: 1,
+                    username: 1,
+                    fullName: 1,
+                    avatar: 1,
+                    totalSubscribers: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $unwind: "$channel",
+          },
+          // Map subscription doc → channel details
+          {
+            $project: {
+              _id: "$channel._id",
+              username: "$channel.username",
+              fullName: "$channel.fullName",
+              avatar: "$channel.avatar",
+              totalSubscribers: "$channel.totalSubscribers",
+            },
+          },
+          {
+            $skip: skip,
+          },
+          {
+            $limit: limitNum,
+          },
+        ],
+        // Count total subscriptions for pagination metadata
+        totalCount: [
+          {
+            $count: "count",
+          },
+        ],
+      },
+    },
+  ]);
+
+  const channels = subscriptions[0]?.data || [];
+  const totalChannels = subscriptions[0]?.totalCount[0]?.count || 0;
+
+  // If skip >= total, return empty list
+  if (skip >= totalChannels) {
+    return res.status(200).json(
+      new apiResponse(
+        200,
+        {
+          channels: [],
+          pagination: {
+            total: totalChannels,
+            page: pageNum,
+            limit: limitNum,
+            pages: Math.ceil(totalChannels / limitNum),
+            hasNextPage: false,
+          },
+        },
+        "No channels found for this page."
+      )
+    );
+  }
+
+  const response = {
+    channels,
+    pagination: {
+      total: totalChannels,
+      page: pageNum,
+      limit: limitNum,
+      pages: Math.ceil(totalChannels / limitNum),
+      hasNextPage: pageNum < Math.ceil(totalChannels / limitNum),
+    },
+  };
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        response,
+        "Subscribed channels fetched successfully."
+      )
+    );
 });
 
 export { toggleSubscription, getUserChannelSubscribers, getSubscribedChannels };
