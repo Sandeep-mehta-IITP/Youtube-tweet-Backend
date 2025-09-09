@@ -71,6 +71,126 @@ const toggleSubscription = asyncHandler(async (req, res) => {
 // controller to return subscriber list of a channel
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
   const { channelId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+
+  if (!isValidObjectId(channelId)) {
+    throw new apiError(400, "Invalid channel ID.");
+  }
+
+  // check if channel exists
+  const channelExists = await User.findById(channelId).select("_id fullName");
+  if (!channelExists) {
+    throw new apiError(404, "Channel does not exist.");
+  }
+
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = parseInt(limit, 10) || 10;
+  const skip = (pageNum - 1) * limitNum;
+
+  const result = await Subscription.aggregate([
+    // Step 1: Match all subscriptions for this channel
+    {
+      $match: {
+        channel: new mongoose.Types.ObjectId(channelId),
+      },
+    },
+    // optimzation for DB query
+    {
+      $facet: {
+        data: [
+          // Step 2: Lookup subscriber details from Users collection
+          {
+            $lookup: {
+              from: "users",
+              localField: "subscriber",
+              foreignField: "_id",
+              as: "subscriber",
+              pipeline: [
+                // Lookup: find how many people subscribed to this subscriber
+                {
+                  $lookup: {
+                    from: "subscriptions",
+                    localField: "_id",
+                    foreignField: "channel",
+                    as: "subscribedToSubscriber",
+                  },
+                },
+                // Add subscriber stats
+                {
+                  $addFields: {
+                    subscribedToSubscriber: {
+                      $cond: {
+                        if: {
+                          $in: [
+                            new mongoose.Types.ObjectId(channelId),
+                            "$subscribedToSubscriber.subscriber",
+                          ],
+                        },
+                        then: true,
+                        else: false,
+                      },
+                    },
+                    totalSubscribers: {
+                      $size: "$subscribedToSubscriber",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          // Step 3: Unwind subscriber array (clean data)
+          {
+            $unwind: "$subscriber",
+          },
+          // Step 4: Project clean fields for output
+          {
+            $project: {
+              _id: "$subscriber._id",
+              fullName: "$subscriber.fullName",
+              username: "$subscriber.username",
+              avatar: "$subscriber.avatar",
+              subscribedToSubscriber: "$subscriber.subscribedToSubscriber",
+              totalSubscribers: "$subscriber.totalSubscribers",
+            },
+          },
+          {
+            $sort: {
+              createdAt: -1,
+            },
+          },
+          {
+            $skip: skip,
+          },
+          {
+            $limit: parseInt(limit),
+          },
+        ],
+        totalCount: [{ $count: "count" }],
+      },
+    },
+  ]);
+
+  // const totalSubscribers = await Subscription.countDocuments({
+  //   channel: channelId,
+  // });
+
+  const subscribers = result[0]?.data;
+  const totalSubscribers = result[0]?.totalCount[0]?.count || 0;
+
+  const response = {
+    subscribers,
+    pagination: {
+      total: totalSubscribers,
+      page: pageNum,
+      limit: limitNum,
+      pages: Math.ceil(totalSubscribers / limitNum),
+      hasNextPage: pageNum < Math.ceil(totalSubscribers / limitNum),
+    },
+  };
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, response, "Subscribers fetched successfully."));
 });
 
 // controller to return channel list to which user has subscribed
