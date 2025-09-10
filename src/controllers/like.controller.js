@@ -26,8 +26,14 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
   }
 
   const likedAlready = await Like.findOne({
-    video: video._id,
-    likedBy: req.user?._id,
+    $or: [
+      {
+        video: video._id,
+      },
+      {
+        likedBy: req.user?._id,
+      },
+    ],
   }).lean();
 
   if (likedAlready) {
@@ -69,8 +75,14 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
   }
 
   const likedAlready = await Like.findOne({
-    comment: comment._id,
-    likedBy: req.user?._id,
+    $or: [
+      {
+        comment: comment._id,
+      },
+      {
+        likedBy: req.user?._id,
+      },
+    ],
   }).lean();
 
   if (likedAlready) {
@@ -118,8 +130,14 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
   }
 
   const likedAlready = await Like.findOne({
-    tweet: tweet._id,
-    likedBy: req.user?._id,
+    $or: [
+      {
+        tweet: tweet._id,
+      },
+      {
+        likedBy: req.user?._id,
+      },
+    ],
   }).lean();
 
   if (likedAlready) {
