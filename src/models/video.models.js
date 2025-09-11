@@ -33,7 +33,7 @@ const videoSchema = new Schema(
     },
     duration: {
       type: Number, // cloudinary se aayega yeh video ke sath , aws and other service yeh provide krati h
-      required: true,
+      required: false,
     },
     views: {
       type: Number,
@@ -41,7 +41,12 @@ const videoSchema = new Schema(
     },
     isPublished: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ["processing", "published", "failed"], //  enum add
+      default: "processing",
     },
   },
   { timestamps: true }
