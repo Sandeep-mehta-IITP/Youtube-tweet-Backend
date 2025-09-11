@@ -1,6 +1,8 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Video } from "../models/video.models.js";
 import { User } from "../models/user.models.js";
+import { Like } from "../models/like.models.js";
+import { Comment } from "../models/comment.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -8,7 +10,6 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
-import { videoQueue } from "../queues/video.queue.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
@@ -303,8 +304,43 @@ const deleteVideo = asyncHandler(async (req, res) => {
   //TODO: delete video
 
   if (!isValidObjectId(videoId)) {
-    throw
+    throw new apiError(400, "Invlaid video ID.");
   }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new apiError(404, "Video not found.");
+  }
+
+  if (video?.owner.toString() !== req.user?._id.toString()) {
+    throw new apiError(403, "You are not authorized to delete this video.");
+  }
+
+  const deletedVideo = await Video.findByIdAndDelete(video?._id);
+
+  if (!deletedVideo) {
+    throw new apiError(500, "Failed to delete video, please try again later.");
+  }
+
+  await Promise.all([
+    deleteFromCloudinary(video?.videoFile?.public_id),
+    deleteFromCloudinary(video?.thumbnail?.public_id),
+  ]);
+
+  await Like.deleteMany({
+    video: video?._id,
+  });
+
+  await Comment.deleteMany({
+    video: video?._id,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(200, { deleted: true }, "Video deleted successfully.")
+    );
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
