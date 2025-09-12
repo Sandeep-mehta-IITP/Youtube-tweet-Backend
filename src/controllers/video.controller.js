@@ -11,14 +11,130 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 
+//TODO: get all videos based on query, sort, pagination
 const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
-  //TODO: get all videos based on query, sort, pagination
+  let { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+
+  const pipeline = [];
+  // for using full text based search u need to create a search index in mongoDB atlas
+  // you can include field mappings in search index eg title, descriptio, as well
+  // field mappings specify which fields within your document should be indexed fro text serach
+  // this helps in searching only in title, description providing faster search results
+  // here the name of search index is 'serach-video'
+
+  if (query) {
+    query = query.toLowerCase().trim();
+    if (query.length > 0 && process.env.SEARCH_INDEX_VIDEOS) {
+      pipeline.push({
+        $search: {
+          index: process.env.SEARCH_INDEX_VIDEOS,
+          text: {
+            query: query,
+            path: ["title", "description"], // saearch only by title and description
+          },
+        },
+      });
+    }
+  }
+
+  if (userId) {
+    if (!isValidObjectId(userId)) {
+      throw new apiError(400, "Invalid user ID.");
+    }
+
+    pipeline.push({
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId),
+      },
+    });
+  }
+
+  // fetch videos only that are set isPublsihed ture
+
+  pipeline.push({
+    $match: {
+      isPublished: true,
+    },
+  });
+
+  // sortBy can be views , createdAt and duration
+  // sortBy can be  ascending (1) or descending (-1)
+
+  const validSortFields = ["views", "duration", "createdAt"];
+
+  if (sortBy) {
+    if (!validSortFields.includes(sortBy)) {
+      throw new apiError(400, `Invalid sortBy field: ${sortBy}`);
+    }
+
+    // [sortBy] yeh key value pair bna rha object ke liye views , duration , createdAt
+    const sortDirection = (sortType || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+    pipeline.push({
+      $sort: {
+        [sortBy]: sortDirection,
+      },
+    });
+    sortType = sortDirection === 1 ? "asc" : "desc"; // normalize for response
+  } else {
+    pipeline.push({
+      $sort: {
+        createdAt: -1,
+      },
+    });
+    sortBy = "createdAt";
+    sortType = "desc";
+  }
+
+  // ower deatails fetch krna
+  pipeline.push(
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: {
+        path: "$ownerDetails",
+        preserveNullAndEmptyArrays: true, // owner delete ho gya to usko handle krna
+      },
+    }
+  );
+
+  const aggregateVideo = Video.aggregate(pipeline);
+
+  const options = {
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10),
+  };
+
+  const video = await Video.aggregatePaginate(aggregateVideo, options);
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        { ...video, sortInfo: { sortBy, sortType } },
+        "Videos fetched successfully."
+      )
+    );
 });
 
+// TODO: get video, upload to cloudinary, create video
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
-  // TODO: get video, upload to cloudinary, create video
 
   const fields = { title, description };
 
@@ -131,9 +247,9 @@ const publishAVideo = asyncHandler(async (req, res) => {
 //   });
 // });
 
+//TODO: get video by id
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: get video by id
 
   if (!isValidObjectId(videoId)) {
     throw new apiError(400, "Invalid video ID.");
@@ -294,14 +410,82 @@ const getVideoById = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, video[0], "Video fetched successfully."));
 });
 
+//TODO: update video details like title, description, thumbnail
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: update video details like title, description, thumbnail
+
+  const { title, description } = req.body;
+
+  if (!isValidObjectId(videoId)) {
+    throw new apiError(400, "Invalid video ID.");
+  }
+
+  if (!(title && description)) {
+    throw new apiError(400, "Title or description is required.");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new apiError(404, "Video not found.");
+  }
+
+  if (video.owner.toString() !== req.user?._id.toString()) {
+    throw new apiError(403, "The video can be updated only by owner.");
+  }
+
+  const oldThumbnail = video?.thumbnail?.url;
+
+  const thumbnailLocalPath = req.file?.path;
+
+  let thumbnail = null;
+
+  if (thumbnailLocalPath) {
+    thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+    if (!thumbnail) {
+      throw new apiError(500, "Thumbnail upload failed.");
+    }
+  }
+
+  const updatedVideo = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        title,
+        description,
+        ...(thumbnail && {
+          // spread operator -> agr thumbnail h to usko set krega aur nhi h to thumbnail ko ignore kr dega.
+          thumbnail: {
+            url: thumbnail?.url,
+            public_id: thumbnail?.public_id,
+          },
+        }),
+      },
+    },
+    { new: true }
+  );
+
+  if (!updatedVideo) {
+    throw new apiError(500, "Failed to update video , please try again later.");
+  }
+
+  // thumbnail upload hone ke bad old thumbnail ko delete krna
+  if (thumbnail && oldThumbnail) {
+    try {
+      await deleteFromCloudinary(oldThumbnail);
+    } catch (err) {
+      throw new apiError(500, "Failed to delete old thumbnail:");
+    }
+  }
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, updatedVideo, "Video updated successfully. "));
 });
 
+//TODO: delete video
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: delete video
 
   if (!isValidObjectId(videoId)) {
     throw new apiError(400, "Invlaid video ID.");
@@ -343,6 +527,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     );
 });
 
+//TODO: toggle publish video
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
