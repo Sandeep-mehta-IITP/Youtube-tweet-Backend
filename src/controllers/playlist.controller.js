@@ -278,7 +278,7 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 
     // remove video from playlist
     {
-      $pull: {   
+      $pull: {
         videos: videoId,
       },
     },
@@ -305,17 +305,42 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     );
 });
 
-
 // TODO: delete playlist
 const deletePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
-  
+
+  if (!isValidObjectId(playlistId)) {
+    throw new apiError(400, "Invalid playlist ID.");
+  }
+
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new apiError(404, "Playlist not found.");
+  }
+
+  if (playlist.owner.toString() !== req.user?._id.toString()) {
+    throw new apiError(
+      401,
+      "Unauthorized: Playlist can be deleted only by owner."
+    );
+  }
+
+  await Playlist.findByIdAndDelete(playlist?._id);
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(200, { delete: true }, "Playlist deleted successfully.")
+    );
 });
 
+
+//TODO: update playlist
 const updatePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   const { name, description } = req.body;
-  //TODO: update playlist
+  
 });
 
 export {
