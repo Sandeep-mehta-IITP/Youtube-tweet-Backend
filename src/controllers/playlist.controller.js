@@ -3,6 +3,8 @@ import { Playlist } from "../models/playlist.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { application } from "express";
+import { User } from "../models/user.models.js";
 
 //TODO: create playlist
 const createPlaylist = asyncHandler(async (req, res) => {
@@ -47,14 +49,140 @@ const createPlaylist = asyncHandler(async (req, res) => {
     .json(new apiResponse(201, playlist, "Playlist created successfully."));
 });
 
+//TODO: get user playlists
 const getUserPlaylists = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  //TODO: get user playlists
+
+  if (!isValidObjectId(userId)) {
+    throw new apiError(400, "Invalid user ID.");
+  }
+
+  const playlists = await Playlist.aggregate([
+    {
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "videos",
+        foreignField: "_id",
+        as: "videos",
+      },
+    },
+    {
+      $addFields: {
+        totalVideos: {
+          $size: "$videos",
+        },
+        totalViews: {
+          $sum: "$videos.views",
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        description: 1,
+        totalVideos: 1,
+        totalViews: 1,
+        updatedAt: 1,
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(200, playlists, "User playlists fetched successfully.")
+    );
 });
 
+
+//TODO: get playlist by id
 const getPlaylistById = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
-  //TODO: get playlist by id
+
+  if (!isValidObjectId(playlistId)) {
+    throw new apiError(400, "Invalid playlist ID.");
+  }
+
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new apiError(404, "Playlist does not exist.");
+  }
+
+  const playlists = await Playlist.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(playlistId),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "videos",
+        foreignField: "_id",
+        as: "videos",
+        pipeline: [
+          {
+            $match: {
+              isPublished: true,
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              description: 1,
+              views: 1,
+              thumbnail: 1,
+              videoFile: 1,
+              duration: 1,
+              createdAt: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        totalVideos: {
+          $size: "$videos",
+        },
+        totalViews: {
+          $sum: "$videos.views",
+        },
+        owner: {
+          $first: "$owner",
+        },
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, playlists, "Playlists fetched successfully."));
 });
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
