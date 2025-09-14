@@ -23,7 +23,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
   // here the name of search index is 'serach-video'
 
   if (query) {
-    query = query.toLowerCase().trim();
+    query = query.trim();
     if (query.length > 0 && process.env.SEARCH_INDEX_VIDEOS) {
       pipeline.push({
         $search: {
