@@ -205,7 +205,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
   }
 
   if (
-    playlist?.owner.toString() !== req.user?._id.toString() ||
+    playlist?.owner.toString() !== req.user?._id.toString() &&
     video?.owner.toString() !== req.user?._id.toString()
   ) {
     throw new apiError(
@@ -244,14 +244,72 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     );
 });
 
+// TODO: remove video from playlist
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   const { playlistId, videoId } = req.params;
-  // TODO: remove video from playlist
+
+  if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
+    throw new apiError(400, "Valid playlist ID and video ID are required.");
+  }
+
+  const playlist = await Playlist.findById(playlistId);
+  const video = await Video.findById(videoId);
+
+  if (!playlist) {
+    throw new apiError(404, "Playlist not found.");
+  }
+
+  if (!video) {
+    throw new apiError(404, "Video not found.");
+  }
+
+  if (
+    playlist.owner.toString() !== req.user?._id.toString() &&
+    video.owner.toString() !== req.user?._id.toString()
+  ) {
+    throw new apiError(
+      401,
+      "Unauthorized: Video can be removed only by owner from playlist."
+    );
+  }
+
+  const updatedPlaylist = await Playlist.findByIdAndUpdate(
+    playlist?._id,
+
+    // remove video from playlist
+    {
+      $pull: {   
+        videos: videoId,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  if (!updatedPlaylist) {
+    throw new apiError(
+      500,
+      "Failed to remove video from playlist, please try again later."
+    );
+  }
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        updatedPlaylist,
+        "Update playlist: Video removed successfully."
+      )
+    );
 });
 
+
+// TODO: delete playlist
 const deletePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
-  // TODO: delete playlist
+  
 });
 
 const updatePlaylist = asyncHandler(async (req, res) => {
