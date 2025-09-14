@@ -335,12 +335,66 @@ const deletePlaylist = asyncHandler(async (req, res) => {
     );
 });
 
-
 //TODO: update playlist
 const updatePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   const { name, description } = req.body;
-  
+
+  if (!isValidObjectId(playlistId)) {
+    throw new apiError(400, "Invalid playlist ID.");
+  }
+
+  if (!name && !description) {
+    throw new apiError(
+      400,
+      "At least one field (name or description) is required."
+    );
+  }
+
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new apiError(404, "Playlist not found.");
+  }
+
+  if (playlist.owner.toString() !== req.user?._id.toString()) {
+    throw new apiError(
+      401,
+      "Unauthorized: Playlist can be updated only by owner."
+    );
+  }
+
+  const updateFields = {};
+  if (name) {
+    updateFields.name = name;
+  }
+
+  if (description) {
+    updateFields.description = description;
+  }
+
+  const updatedPlaylist = await Playlist.findByIdAndUpdate(
+    playlist?._id,
+    {
+      $set: updateFields,
+    },
+    {
+      new: true,
+    }
+  );
+
+  if (!updatedPlaylist) {
+    throw new apiError(
+      500,
+      "Failed to update playlist, please try again later."
+    );
+  }
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(200, updatedPlaylist, "Playlist updated successfully.")
+    );
 });
 
 export {
