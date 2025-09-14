@@ -11,6 +11,7 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 
+
 //TODO: get all videos based on query, sort, pagination
 const getAllVideos = asyncHandler(async (req, res) => {
   let { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
@@ -131,6 +132,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
       )
     );
 });
+
+
 
 // TODO: get video, upload to cloudinary, create video
 const publishAVideo = asyncHandler(async (req, res) => {
