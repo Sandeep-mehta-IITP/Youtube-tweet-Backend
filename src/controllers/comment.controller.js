@@ -6,8 +6,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { Video } from "../models/video.models.js";
 import { Like } from "../models/like.models.js";
 
+
+ //TODO: get all comments for a video
 const getVideoComments = asyncHandler(async (req, res) => {
-  //TODO: get all comments for a video
+ 
   const { videoId } = req.params;
   const { page = 1, limit = 10 } = req.query;
 
@@ -21,7 +23,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         video: new mongoose.Types.ObjectId(videoId),
       },
     },
-
+    // comment owner
     {
       $lookup: {
         from: "users",
@@ -30,6 +32,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         as: "owner",
       },
     },
+    // likes on comment
     {
       $lookup: {
         from: "likes",
@@ -95,8 +98,11 @@ const getVideoComments = asyncHandler(async (req, res) => {
     );
 });
 
+
+
+// TODO: add a comment to a video
 const addComment = asyncHandler(async (req, res) => {
-  // TODO: add a comment to a video
+  
 
   // get content, videoID from frontend
   //  validation -> content videoID
@@ -146,8 +152,10 @@ const addComment = asyncHandler(async (req, res) => {
     .json(new apiResponse(201, newComment, "Commet created successfully."));
 });
 
+
+// TODO: update a comment
 const updateComment = asyncHandler(async (req, res) => {
-  // TODO: update a comment
+  
   const { commentId } = req.params;
   const { content } = req.body;
 
@@ -186,8 +194,10 @@ const updateComment = asyncHandler(async (req, res) => {
     );
 });
 
+
+// TODO: delete a comment
 const deleteComment = asyncHandler(async (req, res) => {
-  // TODO: delete a comment
+  
 
   const { commentId } = req.params;
 

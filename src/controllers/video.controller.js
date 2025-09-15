@@ -250,6 +250,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
 //   });
 // });
 
+
 //TODO: get video by id
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -413,6 +414,8 @@ const getVideoById = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, video[0], "Video fetched successfully."));
 });
 
+
+
 //TODO: update video details like title, description, thumbnail
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -486,6 +489,8 @@ const updateVideo = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, updatedVideo, "Video updated successfully. "));
 });
 
+
+
 //TODO: delete video
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -529,6 +534,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
       new apiResponse(200, { deleted: true }, "Video deleted successfully.")
     );
 });
+
+
 
 //TODO: toggle publish video
 const togglePublishStatus = asyncHandler(async (req, res) => {

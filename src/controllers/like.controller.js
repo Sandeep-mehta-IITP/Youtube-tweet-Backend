@@ -7,9 +7,11 @@ import { Video } from "../models/video.models.js";
 import { Comment } from "../models/comment.models.js";
 import { Tweet } from "../models/tweet.models.js";
 
+
+ //TODO: toggle like on video
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: toggle like on video
+ 
 
   if (!videoId) {
     throw new apiError(400, "Video Id is required.");
@@ -56,9 +58,11 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, { isLiked: true }, "Video liked successfully"));
 });
 
+
+ //TODO: toggle like on comment
 const toggleCommentLike = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
-  //TODO: toggle like on comment
+ 
 
   if (!commentId) {
     throw new apiError(400, "Comment ID is required.");
@@ -111,9 +115,11 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     );
 });
 
+
+//TODO: toggle like on tweet
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
-  //TODO: toggle like on tweet
+  
 
   if (!tweetId) {
     throw new apiError(400, "Tweet ID is required.");
@@ -160,8 +166,10 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, { isLiked: true }, "Tweet liked successfully."));
 });
 
+
+//TODO: get all liked videos
 const getLikedVideos = asyncHandler(async (req, res) => {
-  //TODO: get all liked videos
+  
 
   if (!req.user?._id) {
     throw new apiError(

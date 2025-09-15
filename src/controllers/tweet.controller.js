@@ -5,9 +5,8 @@ import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-// Create a tweet
+//TODO: create tweet
 const createTweet = asyncHandler(async (req, res) => {
-  //TODO: create tweet
   // get content from fronted
   // check if content is provided
   // get owner of the tweet
@@ -45,10 +44,11 @@ const createTweet = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, tweet, "Tweet created successfully."));
 });
 
-// update tweet
-const updateTweet = asyncHandler(async (req, res) => {
-  //TODO: update tweet
 
+
+//TODO: update tweet
+const updateTweet = asyncHandler(async (req, res) => {
+  
   const { content } = req.body;
   const { tweetId } = req.params;
 
@@ -89,9 +89,11 @@ const updateTweet = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, updatedTweet, "Tweet updated successfully."));
 });
 
-// delete tweet
+
+
+//TODO: delete tweet
 const deleteTweet = asyncHandler(async (req, res) => {
-  //TODO: delete tweet
+  
   const { tweetId } = req.params;
 
   if (!isValidObjectId(tweetId)) {
@@ -117,9 +119,11 @@ const deleteTweet = asyncHandler(async (req, res) => {
     );
 });
 
-// get user all tweets
+
+
+// TODO: get user tweets
 const getUserTweets = asyncHandler(async (req, res) => {
-  // TODO: get user tweets
+  
   const { userId } = req.params;
 
   if (!userId) {
