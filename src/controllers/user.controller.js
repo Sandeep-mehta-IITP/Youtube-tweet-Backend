@@ -1,4 +1,3 @@
-
 import { User } from "../models/user.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
@@ -137,14 +136,28 @@ const loginUser = asyncHandler(async (req, res) => {
   // generate access and refresh token
   // send cookie
 
-  const { username, email, password } = req.body;
+  const { identifier, password } = req.body;
 
-  if (!username && !email) {
+  if (!identifier) {
     throw new apiError(400, "username or email is required");
   }
 
+  if (!password) {
+    throw new apiError(400, "password is required.");
+  }
+
+  // Check whether identifier is email or username
+  // let query = {};
+  // if (identifier.includes("@")) {
+  //   query = { email: identifier };
+  // } else {
+  //   query = { username: identifier };
+  // }
+
+  // const user = await User.findOne(query);
+
   const user = await User.findOne({
-    $or: [{ username }, { email }],
+    $or: [{ email: identifier }, { username: identifier }],
   });
 
   if (!user) {
@@ -497,7 +510,12 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         isSubscribed: {
           $cond: {
-            if: { $in: [new mongoose.Types.ObjectId(req.user?._id), "$subscribers.subscriber"] },
+            if: {
+              $in: [
+                new mongoose.Types.ObjectId(req.user?._id),
+                "$subscribers.subscriber",
+              ],
+            },
             then: true,
             else: false,
           },
@@ -523,13 +541,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     throw new apiError(404, "Channel does not exist.");
   }
 
-  return res
-    .status(200)
-    .json(
-      new apiResponse(200, channel[0], "Channel details fetched successfully")  // hume array me se first element chahiye kyunki user ki ek hi profile hogi 
-    );
+  return res.status(200).json(
+    new apiResponse(200, channel[0], "Channel details fetched successfully") // hume array me se first element chahiye kyunki user ki ek hi profile hogi
+  );
 });
-
 
 // get user watch history
 const getWatchHistory = asyncHandler(async (req, res) => {
