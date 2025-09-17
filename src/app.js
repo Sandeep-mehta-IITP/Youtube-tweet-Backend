@@ -41,7 +41,15 @@ app.use("/api/v1/dashboard", dashboardRouter);
 // Error Handling of Express
 app.use((err, req, res, next) => {
   console.error("Express Error :", err);
-  process.exit(1);
+
+  const statusCode = err.statusCode || 500;
+
+  return res.status(statusCode).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    errors: err.errors || [],
+    data: err.data || null,
+  });
 });
 
 export { app };
