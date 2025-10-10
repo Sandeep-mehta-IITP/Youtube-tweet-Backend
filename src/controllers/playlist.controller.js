@@ -56,6 +56,8 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     throw new apiError(400, "Invalid user ID.");
   }
 
+   // THINKME : playlist thumbnail
+
   const playlists = await Playlist.aggregate([
     {
       $match: {
