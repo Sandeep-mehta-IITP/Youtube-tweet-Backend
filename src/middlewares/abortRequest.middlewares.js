@@ -1,4 +1,4 @@
-import { asyncHandler } from "../utils/asyncHandler";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const checkAbort = asyncHandler((req, res, next) => {
   req.connection.on("close", () => {
