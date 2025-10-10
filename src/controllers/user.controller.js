@@ -590,15 +590,41 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     },
   ]);
 
+  let watchHistory = user[0].watchHistory;
+
   return res
     .status(200)
     .json(
       new apiResponse(
         200,
-        user[0].watchHistory,
+        watchHistory.reverse(),
         "Watch history fectched successfully."
       )
     );
+});
+
+const clearWatchHistory = asyncHandler(async (req, res) => {
+  const userId = new mongoose.Types.ObjectId(req.user?._id);
+
+  const isClear = await User.findByIdAndDelete(
+    userId,
+    {
+      $set: {
+        watchHistory: [],
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  if (!isClear) {
+    throw new apiError(500, "Failed to clear user watch history.");
+  }
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, [], "User watch history clean successfully."));
 });
 
 export {
@@ -613,4 +639,5 @@ export {
   updateUserCoverImage,
   getUserChannelProfile,
   getWatchHistory,
+  clearWatchHistory,
 };
