@@ -19,7 +19,7 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
       throw new apiError(401, "Unauthorized access - token missing");
     }
 
-    const decodedToken = jwt.decode(token, process.env.ACCESS_TOKEN_SECRET);
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
 
     const user = await User.findById(decodedToken._id).select(

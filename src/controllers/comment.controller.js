@@ -6,10 +6,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { Video } from "../models/video.models.js";
 import { Like } from "../models/like.models.js";
 
-
- //TODO: get all comments for a video
+//TODO: get all comments for a video
 const getVideoComments = asyncHandler(async (req, res) => {
- 
   const { videoId } = req.params;
   const { page = 1, limit = 10 } = req.query;
 
@@ -17,7 +15,12 @@ const getVideoComments = asyncHandler(async (req, res) => {
     throw new apiError(400, "Valid video ID is required.");
   }
 
-  const videoComments = Comment.aggregate([
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new apiError(404, "Video not found.");
+  }
+
+  const videoAllComments = Comment.aggregate([
     {
       $match: {
         video: new mongoose.Types.ObjectId(videoId),
@@ -30,39 +33,122 @@ const getVideoComments = asyncHandler(async (req, res) => {
         localField: "owner",
         foreignField: "_id",
         as: "owner",
+        pipeline: [
+          {
+            $project: {
+              fullName: 1,
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
       },
     },
-    // likes on comment
+    {
+      $unwind: "$owner",
+    },
+    // fetch likes on comment
     {
       $lookup: {
         from: "likes",
         localField: "_id",
         foreignField: "comment",
         as: "likes",
+        pipeline: [
+          {
+            $match: {
+              liked: true,
+            },
+          },
+          {
+            $project: {
+              likedBy: 1,
+            },
+          },
+        ],
       },
     },
     {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "comment",
+        as: "dislikes",
+        pipeline: [
+          {
+            $match: {
+              liked: false,
+            },
+          },
+          {
+            $project: {
+              likedBy: 1,
+            },
+          },
+        ],
+      },
+    },
+    // reshape likes or dislikes
+    {
       $addFields: {
+        likes: {
+          $map: {
+            input: "$likes",
+            as: "like",
+            in: "$$like.likedBy",
+          },
+        },
+        dislikes: {
+          $map: {
+            input: "$dislikes",
+            as: "dislike",
+            in: "$$dislike.likedBy",
+          },
+        },
         likesCount: {
           $size: "$likes",
         },
-        owner: {
-          $first: "$owner",
+        disLikesCount: {
+          $size: "$dislikes",
+        },
+        isOwner: {
+          $cond: {
+            if: { $eq: [req.user?._id, "$owner._id"] },
+            then: true,
+            else: false,
+          },
         },
         isLiked: req.user?._id
           ? {
               $cond: {
                 if: {
-                  $in: [
-                    new mongoose.Types.ObjectId(req.user?._id),
-                    "$likes.likedBy",
-                  ],
+                  $in: [new mongoose.Types.ObjectId(req.user?._id), "$likes"],
                 },
                 then: true,
                 else: false,
               },
             }
           : false,
+        isDisLiked: req.user?._id
+          ? {
+              $cond: {
+                if: {
+                  $in: [new mongoose.Types.ObjectId(req.user?._id), "$likes"],
+                },
+                then: true,
+                else: false,
+              },
+            }
+          : false,
+        isLikedByVideoOwner: {
+          $cond: {
+            if: {
+              $in: [video.owner, "$likes"],
+            },
+            then: true,
+            else: false,
+          },
+        },
       },
     },
     {
@@ -73,14 +159,15 @@ const getVideoComments = asyncHandler(async (req, res) => {
     {
       $project: {
         content: 1,
-        likesCount: 1,
-        isLiked: 1,
         createdAt: 1,
-        owner: {
-          username: 1,
-          fullName: 1,
-          avatar: 1,
-        },
+        updatedAt: 1,
+        likesCount: 1,
+        dislikesCount: 1,
+        isLiked: 1,
+        isDisLiked: 1,
+        isOwner: 1,
+        isLikedByVideoOwner: 1,
+        owner: 1,
       },
     },
   ]);
@@ -90,7 +177,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
     limit: parseInt(limit, 10),
   };
 
-  const comments = await Comment.aggregatePaginate(videoComments, options);
+  const comments = await Comment.aggregatePaginate(videoAllComments, options);
   return res
     .status(200)
     .json(
@@ -98,12 +185,8 @@ const getVideoComments = asyncHandler(async (req, res) => {
     );
 });
 
-
-
 // TODO: add a comment to a video
 const addComment = asyncHandler(async (req, res) => {
-  
-
   // get content, videoID from frontend
   //  validation -> content videoID
   // user login or not to post comment
@@ -152,10 +235,8 @@ const addComment = asyncHandler(async (req, res) => {
     .json(new apiResponse(201, newComment, "Commet created successfully."));
 });
 
-
 // TODO: update a comment
 const updateComment = asyncHandler(async (req, res) => {
-  
   const { commentId } = req.params;
   const { content } = req.body;
 
@@ -194,11 +275,8 @@ const updateComment = asyncHandler(async (req, res) => {
     );
 });
 
-
 // TODO: delete a comment
 const deleteComment = asyncHandler(async (req, res) => {
-  
-
   const { commentId } = req.params;
 
   if (!commentId || !isValidObjectId(commentId)) {

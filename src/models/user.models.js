@@ -43,9 +43,25 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Password is required"],
     },
+    description: {
+      type: String,
+      default: "",
+    },
     refreshToken: {
       type: String,
     },
+    links: [
+      {
+        name: {
+          type: String,
+          required: true,
+        },
+        url: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
   },
   {
     timestamps: true,
