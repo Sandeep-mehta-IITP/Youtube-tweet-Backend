@@ -3,8 +3,6 @@ import { Playlist } from "../models/playlist.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { application } from "express";
-import { User } from "../models/user.models.js";
 import { Video } from "../models/video.models.js";
 
 //TODO: create playlist
@@ -66,11 +64,39 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
         from: "videos",
         localField: "videos",
         foreignField: "_id",
         as: "videos",
+        pipeline: [
+          {
+            $project: {
+              thumbnail: 1,
+              views: 1,
+            },
+          },
+        ],
       },
+    },
+    {
+      $unwind: "$owner",
     },
     {
       $addFields: {
@@ -80,6 +106,9 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         totalViews: {
           $sum: "$videos.views",
         },
+        thumbnail: {
+          $first: "$videos.thumbnail",
+        },
       },
     },
     {
@@ -87,8 +116,11 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         _id: 1,
         name: 1,
         description: 1,
+        thumbnail: 1,
         totalVideos: 1,
         totalViews: 1,
+        owner: 1,
+        createdAt: 1,
         updatedAt: 1,
       },
     },
@@ -129,8 +161,28 @@ const getPlaylistById = asyncHandler(async (req, res) => {
         as: "videos",
         pipeline: [
           {
-            $match: {
-              isPublished: true,
+            $match: { isPublished: true },
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    fullName: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: { $first: "$owner" },
             },
           },
           {
@@ -143,6 +195,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
               videoFile: 1,
               duration: 1,
               createdAt: 1,
+              owner: 1,
             },
           },
         ],
@@ -167,15 +220,24 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     },
     {
       $addFields: {
-        totalVideos: {
-          $size: "$videos",
-        },
-        totalViews: {
-          $sum: "$videos.views",
-        },
-        owner: {
-          $first: "$owner",
-        },
+        owner: { $first: "$owner" },
+        totalVideos: { $size: "$videos" },
+        totalViews: { $sum: "$videos.views" },
+        thumbnail: { $first: "$videos.thumbnail" },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        description: 1,
+        owner: 1,
+        videos: 1,
+        totalVideos: 1,
+        totalViews: 1,
+        thumbnail: 1,
+        createdAt: 1,
+        updatedAt: 1,
       },
     },
   ]);
@@ -397,6 +459,40 @@ const updatePlaylist = asyncHandler(async (req, res) => {
     );
 });
 
+//TODO: saved playlists
+const getVideoSavePlaylists = asyncHandler(async(req, res) => {
+  const {videoId} = req.params;
+
+  if (!isValidObjectId(videoId)) {
+    throw new apiError(400, "Invalid video Id.")
+  }
+
+  const playlists = await Playlist.aggregate([
+    {
+      $match: {
+        owner: new mongoose.Types.ObjectId(req.user?._id),
+      }
+    },
+    {
+      $project: {
+        name: 1,
+        isVideoPresent: {
+          $cond: {
+            if: { $in: [new mongoose.Types.ObjectId(videoId), "$videos"]},
+            then: true,
+            else: false,
+          }
+        }
+      }
+    }
+  ])
+
+  return res.status(200).json(
+    new apiResponse(200, playlists, "Playlists sent successfully!!!")
+  )
+})
+
+
 export {
   createPlaylist,
   getUserPlaylists,
@@ -405,4 +501,5 @@ export {
   removeVideoFromPlaylist,
   deletePlaylist,
   updatePlaylist,
+  getVideoSavePlaylists,
 };
