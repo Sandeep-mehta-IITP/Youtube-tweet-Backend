@@ -228,11 +228,20 @@ const addComment = asyncHandler(async (req, res) => {
   const newComment = await Comment.findById(comment?._id).populate(
     "owner",
     "username fullName avatar"
-  );
+  ).lean();
+
+  const commentData = {
+    ...newComment,
+    likesCount: 0,
+    isOwner: newComment?.owner?._id?.toString() === req.user?._id?.toString(),
+    isLiked: false,
+    isDisLiked: false,
+    isLikedByVideoOwner: video.owner?.toString() === req.user?._id?.toString(),
+  };
 
   return res
     .status(201)
-    .json(new apiResponse(201, newComment, "Commet created successfully."));
+    .json(new apiResponse(201, commentData, "Commet created successfully."));
 });
 
 // TODO: update a comment
@@ -296,13 +305,15 @@ const deleteComment = asyncHandler(async (req, res) => {
   await Comment.findByIdAndDelete(commentId);
 
   await Like.deleteMany({
-    comment: commentId,
+    comment: new mongoose.Types.ObjectId(commentId),
     likedBy: req.user._id,
   });
 
   return res
     .status(200)
-    .json(new apiResponse(200, {}, "Comment deleted successfully."));
+    .json(
+      new apiResponse(200, { isDeleted: true }, "Comment deleted successfully.")
+    );
 });
 
 export { getVideoComments, addComment, updateComment, deleteComment };
