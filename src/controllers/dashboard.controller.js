@@ -101,12 +101,45 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         owner: new mongoose.Types.ObjectId(userId),
       },
     },
+    // lookup for likes
     {
       $lookup: {
         from: "likes",
         localField: "_id",
         foreignField: "video",
         as: "likes",
+        pipeline: [
+          {
+            $match: {
+              liked: true,
+            },
+          },
+        ],
+      },
+    },
+    // lookup for dislikes
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "video",
+        as: "dislikes",
+        pipeline: [
+          {
+            $match: {
+              liked: false,
+            },
+          },
+        ],
+      },
+    },
+    // lookup for comments
+    {
+      $lookup: {
+        from: "comments",
+        localField: "_id",
+        foreignField: "video",
+        as: "comments",
       },
     },
     {
@@ -124,6 +157,12 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         likesCount: {
           $size: "$likes",
         },
+        dislikesCount: {
+          $size: "$dislikes"
+        },
+        commentsCount: {
+          $size: "$comments"
+        }
       },
     },
     {
@@ -135,6 +174,8 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         description: 1,
         views: 1,
         likesCount: 1,
+        dislikesCount: 1,
+        commentsCount: 1,
         isPublished: 1,
         formattedDate: {
           date: "$createdAtParts.day",
