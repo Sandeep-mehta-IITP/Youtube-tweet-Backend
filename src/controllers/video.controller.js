@@ -3,6 +3,7 @@ import { Video } from "../models/video.models.js";
 import { User } from "../models/user.models.js";
 import { Like } from "../models/like.models.js";
 import { Comment } from "../models/comment.models.js";
+import { Playlist } from "../models/playlist.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -10,7 +11,6 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
-
 
 //TODO: get all videos based on query, sort, pagination
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -133,8 +133,6 @@ const getAllVideos = asyncHandler(async (req, res) => {
     );
 });
 
-
-
 // TODO: get video, upload to cloudinary, create video
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
@@ -147,8 +145,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
     }
   }
 
-  const videoFileLocalPath = req.files?.videoFile[0].path;
-  const thumbnailLocalPath = req.files?.thumbnail[0].path;
+  const videoFileLocalPath = req.files?.videoFile[0]?.path;
+  const thumbnailLocalPath = req.files?.thumbnail[0]?.path;
 
   //console.log("videoFileLocalPath:", videoFileLocalPath);
   //console.log("thumbnailLocalPath:", thumbnailLocalPath);
@@ -158,11 +156,18 @@ const publishAVideo = asyncHandler(async (req, res) => {
   }
 
   if (!thumbnailLocalPath) {
-    throw new apiError(400, "thumbnial is required.");
+    throw new apiError(400, "thumbnail is required.");
   }
 
   if (!req.user?._id) {
     throw new apiError(401, "You must be logged in to publish a video.");
+  }
+
+  // check if connection closed then abort operations else continue
+  if (req.customConnectionClosed) {
+    console.log("Connection closed, aborting video and thumbnail upload...");
+    console.log("All resources Cleaned up & request closed...");
+    return; // Preventing further execution
   }
 
   let videoFile, thumbnail;
@@ -177,11 +182,22 @@ const publishAVideo = asyncHandler(async (req, res) => {
   }
 
   if (!videoFile) {
-    throw new apiError(500, "Failed to uplaod videoFile.");
+    throw new apiError(500, "Failed to upload videoFile.");
   }
 
   if (!thumbnail) {
-    throw new apiError(500, "Failed to uplaod thumbnail.");
+    throw new apiError(500, "Failed to upload thumbnail.");
+  }
+
+  // check if connection closed then delete video & thumbnail and abort db operation else continue
+  if (req.customConnectionClosed) {
+    console.log(
+      "Connection closed!!! deleting video & thumbnail and aborting db operation..."
+    );
+    await deleteFromCloudinary(videoFile.public_id);
+    await deleteFromCloudinary(thumbnail.public_id);
+    console.log("All resources Cleaned up & request closed...");
+    return; // Preventing further execution
   }
 
   const video = await Video.create({
@@ -201,13 +217,18 @@ const publishAVideo = asyncHandler(async (req, res) => {
   });
 
   if (!video) {
-    // performance ko increase krne ke liye. -> two await query ek sath run hogi.
+    throw new apiError(500, "Failed to publish video, please try again.");
+  }
+
+  if (req.customConnectionClosed) {
+    console.log("Connection closed!!! deleting video, thumbnail & DB entry...");
     await Promise.all([
       deleteFromCloudinary(videoFile.public_id),
       deleteFromCloudinary(thumbnail.public_id),
-    ]).catch(() => {});
-
-    throw new apiError(500, "Failed to publish video, please try again.");
+    ]);
+    await Video.findByIdAndDelete(video._id);
+    console.log("All resources cleaned up & request closed...");
+    return;
   }
 
   // const video = await Video.create({
@@ -250,7 +271,6 @@ const publishAVideo = asyncHandler(async (req, res) => {
 //   });
 // });
 
-
 //TODO: get video by id
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -270,6 +290,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     {
       $match: {
         _id: videoObjectId,
+        isPublished: true,
       },
     },
     {
@@ -278,6 +299,39 @@ const getVideoById = asyncHandler(async (req, res) => {
         localField: "_id",
         foreignField: "video",
         as: "likes",
+        pipeline: [
+          {
+            $match: {
+              liked: true,
+            }
+          },
+          {
+            $project: {
+              likedBy: 1,
+            }
+          }
+        ]
+      },
+    },
+    // fetch dislikes of tweet
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "video",
+        as: "dislikes",
+        pipeline: [
+          {
+            $match: {
+              liked: false,
+            },
+          },
+          {
+            $project: {
+              likedBy: 1,
+            },
+          },
+        ],
       },
     },
     // video owner deatils
@@ -365,6 +419,9 @@ const getVideoById = asyncHandler(async (req, res) => {
         likesCount: {
           $size: "$likes",
         },
+        dislikesCount: {
+          $size: "$dislikes"
+        },
         owner: {
           $first: "$owner",
         },
@@ -372,6 +429,15 @@ const getVideoById = asyncHandler(async (req, res) => {
           $cond: {
             if: {
               $in: [userId, "$likes.likedBy"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+        isDisLiked: {
+          $cond: {
+            if: {
+              $in: [userId, "$dislikes.likedBy"],
             },
             then: true,
             else: false,
@@ -391,7 +457,9 @@ const getVideoById = asyncHandler(async (req, res) => {
         comments: 1,
         owner: 1,
         likesCount: 1,
+        dislikesCount: 1,
         isLiked: 1,
+        isDisLiked: 1,
       },
     },
   ]);
@@ -413,8 +481,6 @@ const getVideoById = asyncHandler(async (req, res) => {
     .status(200)
     .json(new apiResponse(200, video[0], "Video fetched successfully."));
 });
-
-
 
 //TODO: update video details like title, description, thumbnail
 const updateVideo = asyncHandler(async (req, res) => {
@@ -489,8 +555,6 @@ const updateVideo = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, updatedVideo, "Video updated successfully. "));
 });
 
-
-
 //TODO: delete video
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -528,14 +592,17 @@ const deleteVideo = asyncHandler(async (req, res) => {
     video: video?._id,
   });
 
+ await Playlist.updateMany(
+    {},
+    { $pull: { videos: video?._id } }
+  );
+
   return res
     .status(200)
     .json(
       new apiResponse(200, { deleted: true }, "Video deleted successfully.")
     );
 });
-
-
 
 //TODO: toggle publish video
 const togglePublishStatus = asyncHandler(async (req, res) => {
