@@ -181,7 +181,7 @@ const getUserTweets = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: true,
+              Liked: true,
             },
           },
           {
@@ -203,7 +203,7 @@ const getUserTweets = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: false,
+              Liked: false,
             },
           },
           {
@@ -300,7 +300,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: true,
+              Liked: true,
             },
           },
           {
@@ -321,7 +321,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: false,
+              Liked: false,
             },
           },
           {
@@ -439,7 +439,7 @@ const getAllUsersFeedTweets = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: true,
+              Liked: true,
             },
           },
           {
@@ -460,7 +460,7 @@ const getAllUsersFeedTweets = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: false,
+              Liked: false,
             },
           },
           {

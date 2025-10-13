@@ -92,6 +92,8 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   const { toggleLike } = req.query;
 
+  //console.log("Togglelike in video like controller", toggleLike);
+
   if (!videoId) throw new apiError(400, "Video ID is required.");
   if (!req.user?._id)
     throw new apiError(401, "You must be logged in to like a video.");
@@ -101,8 +103,8 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 
   // Convert toggleLike to boolean
   let reqLike;
-  if (toggleLike === "true") reqLike = true;
-  else if (toggleLike === "false") reqLike = false;
+  if (toggleLike === true || toggleLike === "true") reqLike = true;
+  else if (toggleLike === false || toggleLike === "false") reqLike = false;
   else throw new apiError(400, "Invalid toggleLike query value.");
 
   // Check if user already liked/disliked
@@ -111,14 +113,18 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     likedBy: req.user._id,
   });
 
+  console.log("req like", reqLike);
+
+  console.log("user like", userLike);
+
   if (userLike) {
-    if (userLike.isLiked === reqLike) {
+    if (userLike.Liked === reqLike) {
       // Same action → remove like/dislike
       await userLike.deleteOne();
       userLike = null;
     } else {
       // Update like/dislike
-      userLike.isLiked = reqLike;
+      userLike.Liked = reqLike;
       await userLike.save();
     }
   } else {
@@ -126,24 +132,29 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     await Like.create({
       video: video._id,
       likedBy: req.user._id,
-      isLiked: reqLike,
+      Liked: reqLike,
     });
   }
 
   // Recalculate counts
   const totalLikes = await Like.countDocuments({
     video: video._id,
-    isLiked: true,
+    Liked: true,
   });
   const totalDisLikes = await Like.countDocuments({
     video: video._id,
-    isLiked: false,
+    Liked: false,
   });
 
   // Determine current user status
   userLike = await Like.findOne({ video: video._id, likedBy: req.user._id });
-  const isLiked = userLike?.isLiked || false;
-  const isDisLiked = userLike && !userLike.isLiked;
+  const isLiked = userLike?.Liked || false;
+  const isDisLiked = userLike && !userLike.Liked;
+
+  console.log("isliked ", isLiked);
+  console.log("isdisliked", isDisLiked);
+  console.log("total likes", totalLikes);
+  console.log("total dislikes", totalDisLikes);
 
   return res
     .status(200)
@@ -170,8 +181,8 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
   // Convert toggleLike to boolean
   let reqLike;
-  if (toggleLike === "true") reqLike = true;
-  else if (toggleLike === "false") reqLike = false;
+  if (toggleLike === true || toggleLike === "true") reqLike = true;
+  else if (toggleLike === false || toggleLike === "false") reqLike = false;
   else throw new apiError(400, "Invalid toggleLike query value.");
 
   // Check if user already liked/disliked
@@ -181,13 +192,13 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
   });
 
   if (userLike) {
-    if (userLike.isLiked === reqLike) {
+    if (userLike.Liked === reqLike) {
       // Same action → remove like/dislike
       await userLike.deleteOne();
       userLike = null;
     } else {
       // Update like/dislike
-      userLike.isLiked = reqLike;
+      userLike.Liked = reqLike;
       await userLike.save();
     }
   } else {
@@ -195,18 +206,18 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     await Like.create({
       comment: comment._id,
       likedBy: req.user._id,
-      isLiked: reqLike,
+      Liked: reqLike,
     });
   }
 
   // Recalculate counts
   const totalLikes = await Like.countDocuments({
     comment: comment._id,
-    isLiked: true,
+    Liked: true,
   });
   const totalDisLikes = await Like.countDocuments({
     comment: comment._id,
-    isLiked: false,
+    Liked: false,
   });
 
   // Determine current user status
@@ -214,8 +225,8 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     comment: comment._id,
     likedBy: req.user._id,
   });
-  const isLiked = userLike?.isLiked || false;
-  const isDisLiked = userLike && !userLike.isLiked;
+  const isLiked = userLike?.Liked || false;
+  const isDisLiked = userLike && !userLike.Liked;
 
   return res
     .status(200)
@@ -242,8 +253,8 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
   // Convert toggleLike to boolean
   let reqLike;
-  if (toggleLike === "true") reqLike = true;
-  else if (toggleLike === "false") reqLike = false;
+  if (toggleLike === true || toggleLike === "true") reqLike = true;
+  else if (toggleLike === false || toggleLike === "false") reqLike = false;
   else throw new apiError(400, "Invalid toggleLike query value.");
 
   // Check if user already liked/disliked
@@ -253,13 +264,13 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
   });
 
   if (userLike) {
-    if (userLike.isLiked === reqLike) {
+    if (userLike.Liked === reqLike) {
       // Same action → remove like/dislike
       await userLike.deleteOne();
       userLike = null;
     } else {
       // Update like/dislike
-      userLike.isLiked = reqLike;
+      userLike.Liked = reqLike;
       await userLike.save();
     }
   } else {
@@ -267,24 +278,24 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
     await Like.create({
       tweet: tweet._id,
       likedBy: req.user._id,
-      isLiked: reqLike,
+      Liked: reqLike,
     });
   }
 
   // Recalculate counts
   const totalLikes = await Like.countDocuments({
     tweet: tweet._id,
-    isLiked: true,
+    Liked: true,
   });
   const totalDisLikes = await Like.countDocuments({
     tweet: tweet._id,
-    isLiked: false,
+    Liked: false,
   });
 
   // Determine current user status
   userLike = await Like.findOne({ tweet: tweet._id, likedBy: req.user._id });
-  const isLiked = userLike?.isLiked || false;
-  const isDisLiked = userLike && !userLike.isLiked;
+  const isLiked = userLike?.Liked || false;
+  const isDisLiked = userLike && !userLike.Liked;
 
   return res
     .status(200)
@@ -372,7 +383,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
           views: "$likedVideos.views",
           isPublished: "$likedVideos.isPublished",
           owner: "$likedVideos.ownerDetails",
-          isLiked: true,
+          Liked: true,
         },
       },
     },
@@ -389,9 +400,4 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     );
 });
 
-export {
-  toggleCommentLike,
-  toggleTweetLike,
-  toggleVideoLike,
-  getLikedVideos,
-};
+export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos };

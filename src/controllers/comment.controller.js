@@ -57,7 +57,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: true,
+              Liked: true,
             },
           },
           {
@@ -77,7 +77,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: false,
+              Liked: false,
             },
           },
           {
@@ -162,7 +162,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         createdAt: 1,
         updatedAt: 1,
         likesCount: 1,
-        dislikesCount: 1,
+        disLikesCount: 1,
         isLiked: 1,
         isDisLiked: 1,
         isOwner: 1,
@@ -178,6 +178,9 @@ const getVideoComments = asyncHandler(async (req, res) => {
   };
 
   const comments = await Comment.aggregatePaginate(videoAllComments, options);
+
+  //console.log("comments", comments);
+  
   return res
     .status(200)
     .json(
@@ -248,6 +251,9 @@ const addComment = asyncHandler(async (req, res) => {
 const updateComment = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
   const { content } = req.body;
+
+  //console.log("content", content);
+  
 
   if (!content) {
     throw new apiError(400, "Content is required.");

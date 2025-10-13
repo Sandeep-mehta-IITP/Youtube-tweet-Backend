@@ -111,7 +111,7 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: true,
+              Liked: true,
             },
           },
         ],
@@ -127,7 +127,7 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: false,
+              Liked: false,
             },
           },
         ],

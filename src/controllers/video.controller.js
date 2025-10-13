@@ -279,20 +279,16 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new apiError(400, "Invalid video ID.");
   }
 
-  if (!isValidObjectId(req.user?._id)) {
-    throw new apiError(400, "Invalid user ID.");
-  }
-
-  const userId = new mongoose.Types.ObjectId(req.user._id);
   const videoObjectId = new mongoose.Types.ObjectId(videoId);
 
   const video = await Video.aggregate([
     {
       $match: {
-        _id: videoObjectId,
+        _id: new mongoose.Types.ObjectId(videoId),
         isPublished: true,
       },
     },
+    // get all likes array (liked: true)
     {
       $lookup: {
         from: "likes",
@@ -302,18 +298,18 @@ const getVideoById = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: true,
-            }
+              Liked: true,
+            },
           },
           {
-            $project: {
-              likedBy: 1,
-            }
-          }
-        ]
+            $addFields: {
+              likeOwner: "$likedBy",
+            },
+          },
+        ],
       },
     },
-    // fetch dislikes of tweet
+    // get all dislikes array (liked: false)
     {
       $lookup: {
         from: "likes",
@@ -323,18 +319,37 @@ const getVideoById = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              liked: false,
+              Liked: false,
             },
           },
           {
-            $project: {
-              likedBy: 1,
+            $addFields: {
+              dislikeOwner: "$likedBy",
             },
           },
         ],
       },
     },
-    // video owner deatils
+    // adjust shapes of likes and dislikes (convert to arrays of owners)
+    {
+      $addFields: {
+        likes: {
+          $map: {
+            input: "$likes",
+            as: "like",
+            in: "$$like.likeOwner",
+          },
+        },
+        dislikes: {
+          $map: {
+            input: "$dislikes",
+            as: "dislike",
+            in: "$$dislike.dislikeOwner",
+          },
+        },
+      },
+    },
+    // fetch owner details
     {
       $lookup: {
         from: "users",
@@ -343,121 +358,53 @@ const getVideoById = asyncHandler(async (req, res) => {
         as: "owner",
         pipeline: [
           {
-            $lookup: {
-              from: "subscriptions",
-              localField: "_id",
-              foreignField: "channel",
-              as: "subscribers",
-            },
-          },
-          {
-            $addFields: {
-              subscribersCount: {
-                $size: "$subscribers",
-              },
-              isSubscribed: {
-                $cond: {
-                  if: {
-                    $in: [userId, "$subscribers.subscriber"],
-                  },
-                  then: true,
-                  else: false,
-                },
-              },
-            },
-          },
-          {
             $project: {
               username: 1,
+              fullName: 1,
               avatar: 1,
-              subscribersCount: 1,
-              isSubscribed: 1,
             },
           },
         ],
       },
     },
-    // comments deatials with comment owner
     {
-      $lookup: {
-        from: "comments",
-        localField: "_id",
-        foreignField: "video",
-        as: "comments",
-        pipeline: [
-          {
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "owner",
-              pipeline: [
-                {
-                  $project: {
-                    username: 1,
-                    avatar: 1,
-                  },
-                },
-              ],
-            },
-          },
-          {
-            $unwind: "$owner",
-          },
-          {
-            $project: {
-              content: 1,
-              owner: 1,
-              createdAt: 1,
-            },
-          },
-        ],
-      },
+      $unwind: "$owner",
     },
+    // add like/dislike stats and user-specific fields
     {
       $addFields: {
-        likesCount: {
-          $size: "$likes",
-        },
-        dislikesCount: {
-          $size: "$dislikes"
-        },
-        owner: {
-          $first: "$owner",
-        },
+        totalLikes: { $size: "$likes" },
+        totalDisLikes: { $size: "$dislikes" },
         isLiked: {
           $cond: {
-            if: {
-              $in: [userId, "$likes.likedBy"],
-            },
+            if: { $in: [req.user?._id, "$likes"] },
             then: true,
             else: false,
           },
         },
         isDisLiked: {
           $cond: {
-            if: {
-              $in: [userId, "$dislikes.likedBy"],
-            },
+            if: { $in: [req.user?._id, "$dislikes"] },
             then: true,
             else: false,
           },
         },
       },
     },
+    // final projection
     {
       $project: {
-        "videoFile.url": 1,
-        "thumbnail.url": 1,
+        videoFile: 1,
         title: 1,
         description: 1,
-        views: 1,
-        createdAt: 1,
         duration: 1,
-        comments: 1,
+        thumbnail: 1,
+        views: 1,
         owner: 1,
-        likesCount: 1,
-        dislikesCount: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        totalLikes: 1,
+        totalDisLikes: 1,
         isLiked: 1,
         isDisLiked: 1,
       },
@@ -471,10 +418,13 @@ const getVideoById = asyncHandler(async (req, res) => {
   //  Update views + watchHistory in parallel
   await Promise.all([
     Video.updateOne({ _id: videoObjectId }, { $inc: { views: 1 } }),
-    User.updateOne(
-      { _id: userId },
-      { $addToSet: { watchHistory: videoObjectId } }
-    ),
+
+    req.user?._id
+      ? User.updateOne(
+          { _id: req.user._id },
+          { $addToSet: { watchHistory: videoObjectId } }
+        )
+      : Promise.resolve(),
   ]);
 
   return res
@@ -592,10 +542,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     video: video?._id,
   });
 
- await Playlist.updateMany(
-    {},
-    { $pull: { videos: video?._id } }
-  );
+  await Playlist.updateMany({}, { $pull: { videos: video?._id } });
 
   return res
     .status(200)
