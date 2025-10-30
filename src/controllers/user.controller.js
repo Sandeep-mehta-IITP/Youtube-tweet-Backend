@@ -606,7 +606,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 const clearWatchHistory = asyncHandler(async (req, res) => {
   const userId = new mongoose.Types.ObjectId(req.user?._id);
 
-  const isClear = await User.findByIdAndDelete(
+  const isClear = await User.findByIdAndUpdate(
     userId,
     {
       $set: {
