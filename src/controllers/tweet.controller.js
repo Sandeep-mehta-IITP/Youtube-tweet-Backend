@@ -340,7 +340,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
         from: "users",
         localField: "owner",
         foreignField: "_id",
-        as: "owner",
+        as: "ownerDetails",
         pipeline: [
           {
             $project: {
@@ -353,7 +353,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
       },
     },
     {
-      $unwind: "$owner",
+      $unwind: "$ownerDetails",
     },
     // reshape likes and dislikes
     {
@@ -376,7 +376,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
         isOwner: {
           $cond: {
             if: {
-              $eq: ["$owner._id", new mongoose.Types.ObjectId(req.user?._id)],
+              $eq: ["$ownerDetails._id", new mongoose.Types.ObjectId(req.user?._id)],
             },
             then: true,
             else: false,
@@ -389,7 +389,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
         content: 1,
         createdAt: 1,
         updateAt: 1,
-        owner: 1,
+        ownerDetails: 1,
         isOwner: 1,
         totalLikes: 1,
         totalDislikes: 1,
