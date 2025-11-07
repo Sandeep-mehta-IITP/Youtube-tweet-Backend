@@ -151,14 +151,16 @@ const addLink = asyncHandler(async (req, res) => {
     req.user?._id,
     {
       $push: {
-        name,
-        url,
+        links: {
+          name,
+          url,
+        },
       },
     },
     {
       new: true,
     }
-  );
+  ).select("username email fullName avatar coverImage description links");
 
   if (!links) {
     throw new apiError(500, "Failed to added link.");

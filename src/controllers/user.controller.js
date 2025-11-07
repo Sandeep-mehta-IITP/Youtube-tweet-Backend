@@ -327,30 +327,46 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
 // update user details like -> fullname , email
 const updateUserDetails = asyncHandler(async (req, res) => {
-  // get user deatails from frontend
-  const { fullName, email } = req.body;
+  // get user details from frontend
+  const { fullName, email, username, description } = req.body;
 
-  if (!fullName || !email) {
-    throw new apiError(400, "User details required");
+  if (!fullName && !email && !username && !description) {
+    throw new apiError(400, "At least one field is required.");
   }
 
-  // checking email is available or not
-  const existingUser = await User.findOne({
-    email,
-    _id: { $ne: req.user._id }, // login user ki id ko chhod kr DB me sabhi id se match krne ke liye
-  });
+  //  Check if email is already used by another user
+  if (email) {
+    const existingEmailUser = await User.findOne({
+      email,
+      _id: { $ne: req.user._id },
+    });
 
-  if (existingUser) {
-    throw new apiError(400, "Email already in use by another account");
+    if (existingEmailUser) {
+      throw new apiError(400, "Email already in use by another account");
+    }
   }
 
-  // find user and update details
+  //  Check if username is already used by another user
+  if (username) {
+    const existingUsernameUser = await User.findOne({
+      username,
+      _id: { $ne: req.user._id },
+    });
+
+    if (existingUsernameUser) {
+      throw new apiError(400, "Username already taken. Please choose another.");
+    }
+  }
+
+  //  Update user details
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
-        fullName,
-        email,
+        ...(fullName && { fullName }),
+        ...(email && { email }),
+        ...(username && { username }),
+        ...(description && { description }),
       },
     },
     { new: true }
@@ -358,7 +374,7 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new apiResponse(200, user, "User details update successfully"));
+    .json(new apiResponse(200, user, "User details updated successfully"));
 });
 
 // update user avatar
