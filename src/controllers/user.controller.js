@@ -8,6 +8,7 @@ import {
 } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import sendOTPEmail from "../utils/sendOTPEmail.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -284,6 +285,28 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
+// verify current password
+const verifyCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword } = req.body;
+
+  if (!oldPassword) {
+    throw new apiError(400, "Current password is required.");
+  }
+
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new apiError(404, "User not found.");
+  }
+
+  const isValid = await user.isPasswordCorrect(oldPassword);
+
+  if (!isValid) {
+    throw new apiError(400, "Invalid current password.");
+  }
+
+  return res.status(200).json(new apiResponse(200, {}, "Password verified."));
+});
+
 // change user password
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
@@ -298,7 +321,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     throw new apiError(404, "User not found.");
   }
 
-  const isValidPassword = user.isPasswordCorrect(oldPassword);
+  const isValidPassword = await user.isPasswordCorrect(oldPassword);
 
   if (!isValidPassword) {
     throw new apiError(400, "Invalid old password");
@@ -311,6 +334,99 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new apiResponse(200, {}, "Password update successfully"));
+});
+
+// forgot password
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new apiError(400, "Email is required.");
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new apiError(404, "No account found with this email.");
+  }
+
+  // generate 6 digit otp
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiry = Date.now() + 10 * 60 * 1000; // 10 mins
+
+  console.log("otp", otp);
+  
+  user.resetPasswordOTP = otp;
+  user.resetPasswordExpiry = otpExpiry;
+  await user.save({ validateBeforeSave: false });
+
+  await sendOTPEmail(email, otp);
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, {}, "OTP sent to your email."));
+});
+
+// verify  otp
+const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    throw new apiError(400, "Email and OTP required");
+  }
+
+  const user = await User.findOne({
+    email,
+    resetPasswordOTP: otp,
+    resetPasswordExpiry: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new apiError(400, "Invalid or expired OTP");
+  }
+
+  // Mark OTP as used
+  user.resetPasswordOTP = undefined;
+  user.resetPasswordExpiry = undefined;
+  user.otpVerified = true;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        { token: await user.generateResetToken() },
+        "OTP verified"
+      )
+    );
+});
+
+// reset password
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    throw new apiError(400, "All fields required");
+  }
+
+  const user = await User.findOne({
+    resetPasswordToken: token,
+    resetPasswordExpiry: { $gt: Date.now() },
+  });
+
+  if (!user || !user.otpVerified) {
+    throw new apiError(400, "Invalid or expired token");
+  }
+
+  user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpiry = undefined;
+  user.otpVerified = false;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, {}, "Password reset successfully"));
 });
 
 // fetch login user information
@@ -553,7 +669,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     },
   ]);
 
-  if (!channel?.length ) {
+  if (!channel?.length) {
     throw new apiError(404, "Channel does not exist.");
   }
 
@@ -648,7 +764,11 @@ export {
   loginUser,
   logoutUser,
   refreshAccessToken,
+  verifyCurrentPassword,
   changeCurrentPassword,
+  forgotPassword,
+  verifyOTP,
+  resetPassword,
   getCurrentUser,
   updateUserDetails,
   updateUserAvatar,

@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 const userSchema = new Schema(
   {
@@ -62,6 +63,19 @@ const userSchema = new Schema(
         },
       },
     ],
+    resetPasswordOTP: {
+      type: String,
+    },
+    resetPasswordExpiry: {
+      type: Date,
+    },
+    resetPasswordToken: {
+      type: String,
+    },
+    otpVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -107,6 +121,15 @@ userSchema.methods.generateRefreshToken = function () {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
     }
   );
+};
+
+// generating reset token
+userSchema.methods.generateResetToken = async function () {
+  const token = crypto.randomBytes(32).toString("hex");
+  this.resetPasswordToken = token;
+  this.resetPasswordExpiry = Date.now() + 10 * 60 * 1000; // 10 mins
+  await this.save({ validateBeforeSave: false });
+  return token;
 };
 
 export const User = mongoose.model("User", userSchema);
