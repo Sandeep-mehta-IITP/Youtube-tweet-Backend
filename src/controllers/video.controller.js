@@ -443,8 +443,8 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new apiError(400, "Invalid video ID.");
   }
 
-  if (!(title && description)) {
-    throw new apiError(400, "Title or description is required.");
+   if (!title && !description && !req.file) {
+    throw new apiError(400, "Please provide at least one field to update.");
   }
 
   const video = await Video.findById(videoId);
