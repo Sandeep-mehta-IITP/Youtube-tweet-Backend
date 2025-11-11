@@ -91,24 +91,10 @@ const getVideoComments = asyncHandler(async (req, res) => {
     // reshape likes or dislikes
     {
       $addFields: {
-        likes: {
-          $map: {
-            input: "$likes",
-            as: "like",
-            in: "$$like.likedBy",
-          },
-        },
-        dislikes: {
-          $map: {
-            input: "$dislikes",
-            as: "dislike",
-            in: "$$dislike.likedBy",
-          },
-        },
-        likesCount: {
+        totalLikes: {
           $size: "$likes",
         },
-        disLikesCount: {
+        totalDisLikes: {
           $size: "$dislikes",
         },
         isOwner: {
@@ -122,7 +108,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
           ? {
               $cond: {
                 if: {
-                  $in: [new mongoose.Types.ObjectId(req.user?._id), "$likes"],
+                  $in: [new mongoose.Types.ObjectId(req.user?._id), "$likes.likedBy"],
                 },
                 then: true,
                 else: false,
@@ -133,7 +119,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
           ? {
               $cond: {
                 if: {
-                  $in: [new mongoose.Types.ObjectId(req.user?._id), "$likes"],
+                  $in: [new mongoose.Types.ObjectId(req.user?._id), "$dislikes.likedBy"],
                 },
                 then: true,
                 else: false,
@@ -161,8 +147,8 @@ const getVideoComments = asyncHandler(async (req, res) => {
         content: 1,
         createdAt: 1,
         updatedAt: 1,
-        likesCount: 1,
-        disLikesCount: 1,
+        totalLikes: 1,
+        totalDisLikes: 1,
         isLiked: 1,
         isDisLiked: 1,
         isOwner: 1,
