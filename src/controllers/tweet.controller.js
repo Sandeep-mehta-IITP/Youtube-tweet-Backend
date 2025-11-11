@@ -220,10 +220,10 @@ const getUserTweets = asyncHandler(async (req, res) => {
     // Add fields
     {
       $addFields: {
-        likesCount: {
+        totalLikes: {
           $size: "$likesDetails",
         },
-        dislikesCount: {
+        totalDislikes: {
           $size: "$dislikesDetails",
         },
         isLiked: {
@@ -264,8 +264,8 @@ const getUserTweets = asyncHandler(async (req, res) => {
       $project: {
         content: 1,
         ownerDetails: 1,
-        likesCount: 1,
-        dislikesCount: 1,
+        totalLikes: 1,
+        totalDislikes: 1,
         createdAt: 1,
         isLiked: 1,
         isDisLiked: 1,
