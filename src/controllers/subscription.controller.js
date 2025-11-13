@@ -26,9 +26,10 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     throw new apiError(400, "Invalid channelId .");
   }
 
-  const chanelExists =
-    await User.findById(channelId).select("_id fullName email");
-  if (!chanelExists) {
+  const channel = await User.findById(channelId).select(
+    "_id fullName username avatar"
+  );
+  if (!channel) {
     throw new apiError(404, "Channel does not exist.");
   }
 
@@ -55,15 +56,31 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     subscribed = true;
   }
 
-  return res
-    .status(200)
-    .json(
-      new apiResponse(
-        200,
-        { subscribed },
-        subscribed ? "Subscribed successfully" : "Unsubscribed successfully"
-      )
-    );
+  // Updated subscriber count
+  const totalSubscribers = await Subscription.countDocuments({
+    channel: channelId,
+  });
+
+  // Updated subscription status for current user
+  const isCurrentlySubscribed = await Subscription.findOne({
+    subscriber: subscriberId,
+    channel: channelId,
+  });
+
+  return res.status(200).json(
+    new apiResponse(
+      200,
+      {
+        _id: channel._id,
+        fullName: channel.fullName,
+        username: channel.username,
+        avatar: channel.avatar,
+        isSubscribed: !!isCurrentlySubscribed, // true/false
+        subscribersCount: totalSubscribers,
+      },
+      subscribed ? "Subscribed successfully" : "Unsubscribed successfully"
+    )
+  );
 });
 
 // controller to return subscriber list of a channel
