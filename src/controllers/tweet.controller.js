@@ -273,9 +273,9 @@ const getUserTweets = asyncHandler(async (req, res) => {
     },
   ]);
 
-  if (!tweet?.length) {
-    throw new apiError(404, "No tweets found for this user.");
-  }
+  // if (!tweet?.length) {
+  //   throw new apiError(404, "No tweets found for this user.");
+  // }
 
   return res
     .status(200)
