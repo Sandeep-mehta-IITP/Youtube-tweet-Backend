@@ -100,8 +100,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
   //console.log("avatar", avatar);
   //console.log("coverImage", coverImage);
-  
-  
 
   if (!avatar) {
     throw new apiError(500, "Failed to upload avatar to Cloudinary.");
@@ -187,6 +185,8 @@ const loginUser = asyncHandler(async (req, res) => {
   const options = {
     httpOnly: true,
     secure: true,
+    sameSite: "none",
+    path: "/",
   };
 
   return res
@@ -223,6 +223,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     const options = {
       httpOnly: true,
       secure: true,
+      sameSite: "none",
+      path: "/",
     };
 
     res
@@ -272,6 +274,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     const options = {
       httpOnly: true,
       secure: true,
+      sameSite: "none",
+      path: "/",
     };
 
     return res
@@ -359,7 +363,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   const otpExpiry = Date.now() + 10 * 60 * 1000; // 10 mins
 
   console.log("otp", otp);
-  
+
   user.resetPasswordOTP = otp;
   user.resetPasswordExpiry = otpExpiry;
   await user.save({ validateBeforeSave: false });
