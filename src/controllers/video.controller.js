@@ -206,11 +206,11 @@ const publishAVideo = asyncHandler(async (req, res) => {
     description,
     duration: videoFile.duration,
     videoFile: {
-      url: videoFile.url,
+      url: videoFile.secure_url,
       public_id: videoFile.public_id,
     },
     thumbnail: {
-      url: thumbnail.url,
+      url: thumbnail.secure_url,
       public_id: thumbnail.public_id,
     },
     owner: req.user?._id,
@@ -479,7 +479,7 @@ const updateVideo = asyncHandler(async (req, res) => {
         ...(thumbnail && {
           // spread operator -> agr thumbnail h to usko set krega aur nhi h to thumbnail ko ignore kr dega.
           thumbnail: {
-            url: thumbnail?.url,
+            url: thumbnail?.secure_url,
             public_id: thumbnail?.public_id,
           },
         }),

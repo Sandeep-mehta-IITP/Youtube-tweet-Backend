@@ -112,8 +112,8 @@ const registerUser = asyncHandler(async (req, res) => {
   const user = await User.create({
     username: username.toLowerCase(),
     fullName,
-    avatar: avatar?.url,
-    coverImage: coverImage?.url || "",
+    avatar: avatar?.secure_url,
+    coverImage: coverImage?.secure_url || "",
     email: email.toLowerCase(),
     password,
   });
@@ -517,7 +517,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     console.log("avatar", avatar);
 
-    if (!avatar?.url) {
+    if (!avatar?.secure_url) {
       throw new apiError(400, "Something went wrong while uploading avatar");
     }
 
@@ -539,7 +539,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
       req.user?._id,
       {
         $set: {
-          avatar: avatar.url,
+          avatar: avatar.secure_url,
         },
       },
       { new: true }
@@ -567,7 +567,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   try {
     const coverImage = await uploadOnCloudinary(localCoverImagePath);
 
-    if (!coverImage?.url) {
+    if (!coverImage?.secure_url) {
       throw new apiError(
         400,
         "Something went wrong while uploading cover image."
@@ -594,7 +594,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
       req.user?._id,
       {
         $set: {
-          coverImage: coverImage.url,
+          coverImage: coverImage.secure_url,
         },
       },
       { new: true }
